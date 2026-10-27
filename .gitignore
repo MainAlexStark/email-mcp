@@ -1,0 +1,18 @@
+bin/
+dist/
+*.exe
+*.test
+*.out
+.env
+.idea/
+.vscode/
+.DS_Store
+go.work
+go.work.sum
+
+# Секреты развёртывания: их пишет deploy.sh
+deploy/*.env
+deploy/kubeconfig
+
+# Резервные копии базы: ./deploy.sh backup
+backups/

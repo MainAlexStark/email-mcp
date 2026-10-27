@@ -1,0 +1,18 @@
+{{define "title"}}Email MCP — Claude для вашей почты{{end}}
+{{define "body"}}
+<h1>Email MCP</h1>
+<p class="sub">Подключите свою почту к Claude: поиск, чтение, черновики, разбор папок
+и ответы — прямо из чата. Gmail, Яндекс, Mail.ru, iCloud и любой ящик с IMAP.</p>
+
+<div class="row"><span>1.</span><span>Зарегистрируйтесь и подключите ящик — адрес и пароль приложения</span></div>
+<div class="row"><span>2.</span><span>Добавьте в Claude коннектор с адресом <span class="mono">{{.ResourceURL}}</span></span></div>
+<div class="row"><span>3.</span><span>Подтвердите доступ: к каким ящикам и с какими правами</span></div>
+
+<p class="hint">Пароль ящика хранится зашифрованным. По умолчанию подключение только читает:
+черновики, изменение ящика и отправку вы разрешаете по отдельности и можете отозвать в любой момент.</p>
+
+<div class="actions">
+  <a class="btn deny" href="/login">Войти</a>
+  {{if .SignupOpen}}<a class="btn allow" href="/signup">Зарегистрироваться</a>{{end}}
+</div>
+{{end}}

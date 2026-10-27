@@ -1,0 +1,131 @@
+{{define "title"}}Кабинет{{end}}
+{{define "cardclass"}}wide{{end}}
+{{define "body"}}
+{{$csrf := .CSRF}}
+<div class="top">
+  <span>{{.Email}} · тариф {{.Plan}} · вызовов за 30 дней: {{.Calls30d}}</span>
+  <form method="post" action="/logout"><input type="hidden" name="csrf" value="{{$csrf}}">
+    <button class="linkbtn" type="submit">Выйти</button></form>
+</div>
+
+{{if .Flash}}<div class="ok">{{.Flash}}</div>{{end}}
+{{if .Error}}<div class="err">{{.Error}}</div>{{end}}
+
+{{if .NewToken}}
+<div class="warn"><b>Токен «{{.NewTokenFor}}» выпущен.</b> Скопируйте его сейчас — больше он показан не будет.
+<span class="copy mono">{{.NewToken}}</span>
+Передавайте его в заголовке <span class="mono">Authorization: Bearer …</span> на адрес MCP.</div>
+{{end}}
+
+<h1>Подключение к Claude</h1>
+<p class="sub">В Claude: <b>Настройки → Коннекторы → Добавить свой коннектор</b>, адрес:</p>
+<span class="copy mono">{{.ResourceURL}}</span>
+<p class="hint">При подключении откроется эта же страница сервиса: выберите ящики (все или один) и права.</p>
+
+<h2>Почтовые ящики</h2>
+{{if .Mailboxes}}
+<div class="scroll"><table class="stack">
+<tr><th>account_id</th><th>Адрес</th><th>Серверы</th><th>Проверка</th><th></th></tr>
+{{range .Mailboxes}}
+<tr>
+  <td class="mono">{{.Name}}</td>
+  <td>{{.Email}}</td>
+  <td class="mono">{{.IMAPHost}}{{if .SMTPHost}}<br>{{.SMTPHost}}{{else}}<br><small>без отправки</small>{{end}}</td>
+  <td>{{if .CheckError}}<span class="err-text">✗ {{.CheckError}}</span>{{else if .CheckedAgo}}✓ {{.CheckedAgo}}{{else}}—{{end}}</td>
+  <td>
+    <form method="post" action="/account/mailboxes/{{.ID}}/check"><input type="hidden" name="csrf" value="{{$csrf}}">
+      <button class="small deny" type="submit">Проверить</button></form>
+    <p class="hint"><a href="/account/mailboxes/{{.ID}}/edit">Настройки и пароль</a></p>
+    <details><summary>Удалить</summary>
+      <form method="post" action="/account/mailboxes/{{.ID}}/delete"><input type="hidden" name="csrf" value="{{$csrf}}">
+        <p class="hint">Пароль будет удалён. Подключения и токены, выданные только к этому ящику, перестанут работать;
+        подключения «ко всем ящикам» его больше не увидят. Письма в самом ящике не трогаются.</p>
+        <button class="small danger" type="submit">Удалить ящик</button></form>
+    </details>
+  </td>
+</tr>
+{{end}}
+</table></div>
+{{else}}
+<p class="sub">Ящиков пока нет.</p>
+{{end}}
+<p class="hint"><a href="/account/mailboxes/new">+ Подключить ящик</a></p>
+
+<h2>Подключённые приложения</h2>
+{{if .Grants}}
+<div class="scroll"><table class="stack">
+<tr><th>Приложение</th><th>Ящики</th><th>Права</th><th>Действует до</th><th></th></tr>
+{{range .Grants}}
+<tr>
+  <td>{{.ClientName}}</td>
+  <td>{{if .MailboxName}}{{.MailboxName}}{{else}}все{{end}}</td>
+  <td>чтение{{if has .Scopes "mail:drafts"}}, черновики{{end}}{{if has .Scopes "mail:write"}}, изменение{{end}}{{if has .Scopes "mail:send"}}, <b>отправка</b>{{end}}</td>
+  <td>{{.ExpiresAt.Format "02.01.2006"}}</td>
+  <td><form method="post" action="/account/grants/{{.GrantID}}/revoke"><input type="hidden" name="csrf" value="{{$csrf}}">
+    <button class="small danger" type="submit">Отозвать</button></form></td>
+</tr>
+{{end}}
+</table></div>
+{{else}}
+<p class="sub">Пока ни одного. Добавьте сервер в Claude по адресу выше.</p>
+{{end}}
+
+<h2>API-токены для автоматизации</h2>
+<p class="hint">Для скриптов и сервисов, которые не могут пройти экран согласия. Бессрочные — отзывайте ненужные.</p>
+{{if .Tokens}}
+<div class="scroll"><table class="stack">
+<tr><th>Название</th><th>Ящики</th><th>Права</th><th>Использован</th><th></th></tr>
+{{range .Tokens}}
+<tr>
+  <td>{{.Name}}</td>
+  <td>{{if .MailboxName}}{{.MailboxName}}{{else}}все{{end}}</td>
+  <td>чтение{{if has .Scopes "drafts"}}, черновики{{end}}{{if has .Scopes "write"}}, изменение{{end}}{{if has .Scopes "send"}}, <b>отправка</b>{{end}}</td>
+  <td>{{if .LastUsedAt}}{{.LastUsedAt.Format "02.01.2006 15:04"}}{{else}}ни разу{{end}}</td>
+  <td><form method="post" action="/account/tokens/{{.ID}}/delete"><input type="hidden" name="csrf" value="{{$csrf}}">
+    <button class="small danger" type="submit">Отозвать</button></form></td>
+</tr>
+{{end}}
+</table></div>
+{{end}}
+{{if .Mailboxes}}
+<details><summary>Выпустить токен</summary>
+<form method="post" action="/account/tokens">
+  <input type="hidden" name="csrf" value="{{$csrf}}">
+  <label class="field"><span>Название</span><input type="text" name="name" maxlength="60" placeholder="Скрипт отчётов"></label>
+  <label class="field"><span>Ящики</span></label>
+  <label class="check"><input type="radio" name="mailbox" value="0" checked>
+    <span><b>Все ящики</b><small>И подключённые позже</small></span></label>
+  {{range .Mailboxes}}
+  <label class="check"><input type="radio" name="mailbox" value="{{.ID}}">
+    <span><b>Только {{.Name}}</b><small>{{.Email}}</small></span></label>
+  {{end}}
+  <label class="check"><input type="checkbox" name="drafts">
+    <span><b>Черновики</b><small>Готовить письма в «Черновиках».</small></span></label>
+  <label class="check"><input type="checkbox" name="write">
+    <span><b>Изменение ящика</b><small>Флаги, перенос, удаление, папки.</small></span></label>
+  <label class="check"><input type="checkbox" name="send">
+    <span><b>Отправка</b><small>Письма от вашего имени.</small></span></label>
+  <div class="actions"><button class="allow" type="submit">Выпустить</button></div>
+</form>
+</details>
+{{end}}
+
+<h2>Учётная запись</h2>
+<details><summary>Сменить пароль</summary>
+<form method="post" action="/account/password">
+  <input type="hidden" name="csrf" value="{{$csrf}}">
+  <label class="field"><span>Текущий пароль</span><input type="password" name="current" autocomplete="current-password" required></label>
+  <label class="field"><span>Новый пароль (от 8 символов)</span><input type="password" name="new" autocomplete="new-password" minlength="8" required></label>
+  <label class="field"><span>Новый пароль ещё раз</span><input type="password" name="new2" autocomplete="new-password" minlength="8" required></label>
+  <div class="actions"><button class="allow" type="submit">Сменить</button></div>
+</form>
+</details>
+<details><summary>Удалить учётную запись</summary>
+<form method="post" action="/account/delete">
+  <input type="hidden" name="csrf" value="{{$csrf}}">
+  <p class="hint">Удаляются пароли всех ящиков, подключения и токены. Письма в самих ящиках не трогаются. Отменить нельзя.</p>
+  <label class="field"><span>Пароль для подтверждения</span><input type="password" name="password" autocomplete="current-password" required></label>
+  <div class="actions"><button class="danger" type="submit">Удалить навсегда</button></div>
+</form>
+</details>
+{{end}}
