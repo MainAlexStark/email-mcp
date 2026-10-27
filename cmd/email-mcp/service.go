@@ -56,6 +56,11 @@ func runService(ctx context.Context, safety tools.Safety, addr string) {
 	if !private {
 		opts = append(opts, mail.WithPublicOnly())
 	}
+	if o, err := proxyOption(); err != nil {
+		fatal(err.Error())
+	} else if o != nil {
+		opts = append(opts, o)
+	}
 	boxSvc := mailboxes.New(db, cipher, opts...)
 	boxSvc.AllowPlaintext = private
 

@@ -7,10 +7,12 @@ import (
 	"fmt"
 	"net"
 	"net/netip"
+	"net/url"
 	"syscall"
 	"time"
 
 	"github.com/emersion/go-imap/v2/imapclient"
+	xproxy "golang.org/x/net/proxy"
 )
 
 // Client — операции с одним ящиком.
@@ -22,6 +24,8 @@ type Client struct {
 type options struct {
 	tlsConfig  *tls.Config
 	publicOnly bool
+	proxy      *url.URL
+	proxyDial  xproxy.Dialer
 }
 
 // Option настраивает клиента.
@@ -40,6 +44,40 @@ func WithTLSConfig(c *tls.Config) Option { return func(o *options) { o.tlsConfig
 // (Control у dialer), поэтому DNS, который отдаёт внутренний адрес,
 // её не обходит.
 func WithPublicOnly() Option { return func(o *options) { o.publicOnly = true } }
+
+// WithProxy направляет IMAP и SMTP через SOCKS5-прокси.
+//
+// Нужен, когда сервер стоит там, откуда почтовый провайдер недоступен
+// (Gmail из России: порты 465/587 не отвечают). Формат —
+// socks5://[user:pass@]host:port; имя почтового сервера уходит прокси
+// как есть, и DNS разрешает он, а не локальная машина.
+//
+// Прокси задаёт оператор, а не пользователь сервиса, поэтому проверка
+// WithPublicOnly к нему не применяется (он может стоять на 127.0.0.1).
+// Целевой адрес при этом разрешается на стороне прокси, и «внутренней
+// сети сервиса» этот трафик не касается.
+func WithProxy(rawURL string) (Option, error) {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return nil, fmt.Errorf("не разобрать адрес прокси: %w", err)
+	}
+	if u.Scheme != "socks5" && u.Scheme != "socks5h" {
+		return nil, fmt.Errorf("прокси %q: поддерживается только socks5://", u.Redacted())
+	}
+	if u.Host == "" {
+		return nil, fmt.Errorf("прокси %q: не указан адрес", u.Redacted())
+	}
+	var auth *xproxy.Auth
+	if u.User != nil {
+		pw, _ := u.User.Password()
+		auth = &xproxy.Auth{User: u.User.Username(), Password: pw}
+	}
+	d, err := xproxy.SOCKS5("tcp", u.Host, auth, &net.Dialer{Timeout: 30 * time.Second, KeepAlive: 30 * time.Second})
+	if err != nil {
+		return nil, fmt.Errorf("прокси %q: %w", u.Redacted(), err)
+	}
+	return func(o *options) { o.proxy, o.proxyDial = u, d }, nil
+}
 
 // New создаёт клиента ящика.
 func New(acc Account, opts ...Option) *Client {
@@ -93,7 +131,17 @@ func (c *Client) tlsConfig(host string) *tls.Config {
 
 // dial открывает соединение с учётом контекста и режима защиты.
 func (c *Client) dial(ctx context.Context, srv Server) (net.Conn, error) {
-	conn, err := c.dialer().DialContext(ctx, "tcp", srv.Addr())
+	var conn net.Conn
+	var err error
+	if c.opts.proxyDial != nil {
+		if cd, ok := c.opts.proxyDial.(xproxy.ContextDialer); ok {
+			conn, err = cd.DialContext(ctx, "tcp", srv.Addr())
+		} else {
+			conn, err = c.opts.proxyDial.Dial("tcp", srv.Addr())
+		}
+	} else {
+		conn, err = c.dialer().DialContext(ctx, "tcp", srv.Addr())
+	}
 	if err != nil {
 		if errors.Is(err, ErrPrivateAddress) {
 			return nil, &Error{Kind: KindInput, Msg: ErrPrivateAddress.Error(), Host: srv.Host}

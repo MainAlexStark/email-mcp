@@ -39,6 +39,7 @@
 //	MAIL_MAX_ITEMS_PER_WRITE писем за одну операцию изменения (100)
 //	MAIL_MAX_RECIPIENTS      получателей без confirm_many_recipients (10)
 //	MAIL_MAX_RESPONSE_BYTES  потолок размера ответа (40000)
+//	MAIL_PROXY               socks5://[user:pass@]host:port — IMAP/SMTP через прокси (Gmail из России)
 //	MAIL_TIMEOUT             потолок одной операции с почтовым сервером (2m)
 //	MAIL_IMAP_SEARCH_CONCURRENCY  соединений на поиск по всем папкам (4, 1–8)
 //	MAIL_IMAP_MAX_MAILBOXES  потолок списка папок (200)
@@ -50,6 +51,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -145,10 +147,18 @@ func main() {
 	safety.Write = envBool("MAIL_ALLOW_WRITES", "MAIL_IMAP_WRITE_ENABLED")
 	safety.Send = envBool("MAIL_ALLOW_SEND", "MAIL_SMTP_WRITE_ENABLED")
 
+	mailOpts := []mail.Option(nil)
+	if o, err := proxyOption(); err != nil {
+		fatal(err.Error())
+	} else if o != nil {
+		mailOpts = append(mailOpts, o)
+	}
+
 	srv := newMCP(tools.Config{
-		Accounts:  accounts,
-		Files:     stdioFiles(),
-		UploadDir: os.Getenv("MAIL_ATTACHMENT_UPLOAD_DIR"),
+		Accounts:    accounts,
+		MailOptions: mailOpts,
+		Files:       stdioFiles(),
+		UploadDir:   os.Getenv("MAIL_ATTACHMENT_UPLOAD_DIR"),
 	}, safety)
 
 	if *check {
@@ -201,7 +211,13 @@ func runCheck(accounts []mail.Account, srv *mcp.Server, safety tools.Safety) {
 	for _, acc := range accounts {
 		fmt.Printf("%s (%s)\n", acc.ID, acc.Sender())
 		ctx, cancel := context.WithTimeout(context.Background(), 40*time.Second)
-		c := mail.New(acc)
+		var mopts []mail.Option
+		if o, err := proxyOption(); err != nil {
+			fatal(err.Error())
+		} else if o != nil {
+			mopts = append(mopts, o)
+		}
+		c := mail.New(acc, mopts...)
 		if res, err := c.VerifyIMAP(ctx); err != nil {
 			failed = true
 			fmt.Printf("  IMAP %s:%d — не прошло: %v\n", acc.IMAP.Host, acc.IMAP.Port, err)
@@ -236,4 +252,19 @@ func runCheck(accounts []mail.Account, srv *mcp.Server, safety tools.Safety) {
 func fatal(msg string) {
 	fmt.Fprintln(os.Stderr, "email-mcp:", msg)
 	os.Exit(1)
+}
+
+// proxyOption читает MAIL_PROXY (socks5://[user:pass@]host:port).
+// Пусто — прямое подключение. Неверный адрес — ошибка на старте:
+// молча ходить напрямую, когда просили через прокси, хуже всего.
+func proxyOption() (mail.Option, error) {
+	raw := strings.TrimSpace(os.Getenv("MAIL_PROXY"))
+	if raw == "" {
+		return nil, nil
+	}
+	o, err := mail.WithProxy(raw)
+	if err != nil {
+		return nil, fmt.Errorf("MAIL_PROXY: %w", err)
+	}
+	return o, nil
 }
