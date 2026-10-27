@@ -4,18 +4,28 @@
 
 | Провайдер | IMAP | SMTP | Пароль |
 |---|---|---|---|
-| Gmail | imap.gmail.com:993 tls | smtp.gmail.com:465 tls | пароль приложения: myaccount.google.com/apppasswords (нужна двухэтапная проверка) |
-| Яндекс | imap.yandex.ru:993 tls | smtp.yandex.ru:465 tls | пароль приложения: id.yandex.ru → Безопасность → Пароли приложений → Почта; включить IMAP в настройках почты |
-| Mail.ru (bk, inbox, list) | imap.mail.ru:993 tls | smtp.mail.ru:465 tls | Настройки → Безопасность → Пароли для внешних приложений |
-| Рамблер | imap.rambler.ru:993 tls | smtp.rambler.ru:465 tls | включить доступ из почтовых программ |
-| iCloud | imap.mail.me.com:993 tls | smtp.mail.me.com:587 starttls | appleid.apple.com → Пароли приложений |
-| Outlook.com | outlook.office365.com:993 tls | smtp-mail.outlook.com:587 starttls | Microsoft отключает вход по паролю для большинства ящиков; OAuth Microsoft — следующий этап |
-| Zoho | imap.zoho.com:993 tls | smtp.zoho.com:465 tls | accounts.zoho.com → App Passwords |
-| GMX | imap.gmx.com:993 tls | mail.gmx.com:587 starttls | обычный пароль, IMAP включается в настройках |
+| Gmail | imap.gmail.com:993 tls | smtp.gmail.com:465 tls | пароль приложения |
+| Яндекс | imap.yandex.ru:993 tls | smtp.yandex.ru:465 tls | пароль приложения + включить IMAP |
+| Mail.ru (bk, inbox, list) | imap.mail.ru:993 tls | smtp.mail.ru:465 tls | пароль приложения с полным доступом к Почте |
+| Рамблер | imap.rambler.ru:993 tls | smtp.rambler.ru:465 tls | основной пароль + включить почтовые программы |
+| iCloud | imap.mail.me.com:993 tls | smtp.mail.me.com:587 starttls | пароль приложения |
+| Outlook.com | outlook.office365.com:993 tls | smtp-mail.outlook.com:587 starttls | по паролю не подключить; OAuth Microsoft — следующий этап |
+| Zoho | imap.zoho.com:993 tls | smtp.zoho.com:465 tls | пароль приложения + включить IMAP |
+| GMX | imap.gmx.com:993 tls | mail.gmx.com:587 starttls | основной пароль + включить IMAP |
+
+### Где взять пароль
+
+Пошаговые инструкции со ссылками живут в одном месте — `Password` у каждого провайдера в `mail/providers.go`. Из них собираются:
+
+- форма «Подключить ящик»: список инструкций для всех сервисов виден сразу, до ввода адреса (страница без JS); после ввода адреса инструкция найденного сервиса — сверху;
+- подсказка к отказу входа (`mail.Hint`) — сервис определяется по адресу IMAP/SMTP-сервера;
+- ответ `get_setup_guide` для Claude (`password.kind`, `password.url`, `password.steps`).
+
+`kind`: `app` — только пароль приложения, `main` — основной пароль, но доступ надо включить, `none` — по паролю не подключить.
 
 ## Свой домен и хостинг
 
-Обычно `imap.<домен>:993` (tls) и `smtp.<домен>:465` (tls) или `:587` (starttls). Если логин не совпадает с адресом (общий ящик), укажите его в «Серверы и логин».
+Пароль — обычно тот же, что для веб-почты; на Яндекс 360 / Google Workspace / Mail.ru для бизнеса — пароль приложения, как у обычного ящика. Серверы обычно `imap.<домен>:993` (tls) и `smtp.<домен>:465` (tls) или `:587` (starttls). Если логин не совпадает с адресом (общий ящик), укажите его в «Серверы и логин».
 
 ## Копия в «Отправленных»
 

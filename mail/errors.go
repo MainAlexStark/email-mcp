@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"strings"
 
 	"github.com/emersion/go-imap/v2"
 	"github.com/emersion/go-smtp"
@@ -178,25 +177,17 @@ func hostOr(h string) string {
 
 // authHint — у крупных провайдеров обычный пароль по IMAP не пускают,
 // и вслепую человек будет перебирать свой основной пароль до блокировки.
+// Инструкция берётся из того же списка провайдеров, что и на странице.
 func authHint(host string) string {
-	h := strings.ToLower(host)
-	switch {
-	case strings.Contains(h, "gmail") || strings.Contains(h, "google"):
-		return "Gmail не пускает по IMAP с обычным паролем. Включите двухэтапную проверку и создайте " +
-			"пароль приложения: myaccount.google.com → Безопасность → Пароли приложений."
-	case strings.Contains(h, "yandex"):
-		return "Яндекс требует пароль приложения: id.yandex.ru → Безопасность → Пароли приложений → Почта. " +
-			"И включите доступ по IMAP: Почта → Настройки → Почтовые программы."
-	case strings.Contains(h, "mail.ru") || strings.Contains(h, "bk.ru") || strings.Contains(h, "inbox.ru") || strings.Contains(h, "list.ru"):
-		return "Mail.ru пускает внешние программы только с паролем приложения: " +
-			"Настройки → Безопасность → Пароли для внешних приложений."
-	case strings.Contains(h, "icloud") || strings.Contains(h, "me.com"):
-		return "iCloud требует пароль приложения: appleid.apple.com → Вход и безопасность → Пароли приложений."
-	case strings.Contains(h, "outlook") || strings.Contains(h, "office365") || strings.Contains(h, "hotmail"):
-		return "Microsoft отключил вход по паролю для IMAP/SMTP у большинства ящиков. Если у вас " +
-			"корпоративный ящик, спросите администратора, разрешён ли IMAP и SMTP AUTH."
-	case strings.Contains(h, "rambler"):
-		return "Рамблер требует включить доступ по IMAP в настройках почты: Настройки → Программы."
+	if p, ok := ProviderForHost(host); ok {
+		switch p.Password.Kind {
+		case PasswordApp:
+			return p.Name + " не пускает с основным паролем — нужен пароль приложения. " + p.Password.Summary()
+		case PasswordMain:
+			return p.Name + ": сервер отклонил пароль. " + p.Password.Summary()
+		case PasswordNone:
+			return p.Name + ": " + p.Password.Summary()
+		}
 	}
 	return "Сервер отклонил логин или пароль. Многие провайдеры требуют отдельный пароль " +
 		"приложения вместо основного и отдельно включённый доступ по IMAP."

@@ -119,6 +119,11 @@ type mailboxFormView struct {
 	Advanced bool
 }
 
+// Providers и CustomGuide — инструкции «где взять пароль» для всех
+// известных сервисов: видны сразу, до ввода адреса (страница без JS).
+func (mailboxFormView) Providers() []mail.Provider      { return mail.Providers }
+func (mailboxFormView) CustomGuide() mail.PasswordGuide { return mail.CustomDomainGuide }
+
 func formFromRequest(r *request) mailboxes.Form {
 	v := r.PostFormValue
 	return mailboxes.Form{
@@ -211,7 +216,7 @@ func (w *Web) mailboxEditForm(rw http.ResponseWriter, r *request) {
 		w.fail(rw, err)
 		return
 	}
-	w.render(rw, http.StatusOK, "mailbox_form", mailboxFormView{
+	view := mailboxFormView{
 		CSRF: r.sess.CSRF, Next: "/account", Edit: true, ID: id, Advanced: true,
 		Form: mailboxes.Form{
 			Name: m.Name, Email: m.Email, DisplayName: m.DisplayName,
@@ -219,7 +224,11 @@ func (w *Web) mailboxEditForm(rw http.ResponseWriter, r *request) {
 			SMTPHost: m.SMTPHost, SMTPPort: portString(m.SMTPPort), SMTPSecurity: m.SMTPSecurity,
 			Username: m.Username,
 		},
-	})
+	}
+	if p, ok := mail.ProviderFor(m.Email); ok {
+		view.Provider = &p
+	}
+	w.render(rw, http.StatusOK, "mailbox_form", view)
 }
 
 func portString(p int) string {

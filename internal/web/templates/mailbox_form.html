@@ -6,8 +6,20 @@
 <b>пароля приложения</b> — серверы подставятся сами. Мы проверим вход до сохранения и будем хранить
 пароль зашифрованным.</p>
 {{if .Error}}<div class="err">{{.Error}}</div>{{end}}
-{{with .Provider}}{{if .AppPassword}}<div class="warn"><b>{{.Name}}:</b> нужен пароль приложения — {{.AppPassword}}.
-{{.Note}}</div>{{else if .Note}}<div class="warn"><b>{{.Name}}:</b> {{.Note}}</div>{{end}}{{end}}
+{{with .Provider}}<div class="warn guide"><b>{{.Name}} — {{.Password.KindLabel}}.</b>
+{{template "steps" .Password}}{{with .Note}}<p>{{.}}</p>{{end}}</div>{{end}}
+
+<h2>{{if .Provider}}Другой сервис?{{else}}Где взять пароль{{end}}</h2>
+<p class="hint">Найдите свой сервис — у каждого свой порядок. Основной пароль от почты большинство сервисов не примут.</p>
+{{$cur := ""}}{{with .Provider}}{{$cur = .Name}}{{end}}
+{{range .Providers}}{{if ne .Name $cur}}<details class="guide">
+<summary><b>{{.Name}}</b> <span class="hint">· {{.Password.KindLabel}} · @{{index .Domains 0}}</span></summary>
+{{template "steps" .Password}}{{with .Note}}<p class="hint">{{.}}</p>{{end}}
+</details>
+{{end}}{{end}}<details class="guide">
+<summary><b>Свой домен, хостинг, корпоративная почта</b></summary>
+{{template "steps" .CustomGuide}}
+</details>
 
 <form method="post" action="{{if .Edit}}/account/mailboxes/{{.ID}}/edit{{else}}/account/mailboxes/new{{end}}">
 <input type="hidden" name="csrf" value="{{.CSRF}}">
@@ -52,3 +64,6 @@
 <div class="actions"><button type="submit" class="allow">Проверить и {{if .Edit}}сохранить{{else}}подключить{{end}}</button></div>
 </form>
 {{end}}
+
+{{define "steps"}}<ol>{{range .Steps}}<li>{{.}}</li>{{end}}</ol>
+{{with .URL}}<p><a href="{{.}}" target="_blank" rel="noopener noreferrer">Открыть страницу →</a></p>{{end}}{{end}}

@@ -24,6 +24,7 @@ import (
 	"github.com/MainAlexStark/email-mcp/internal/secure"
 	"github.com/MainAlexStark/email-mcp/internal/tools"
 	"github.com/MainAlexStark/email-mcp/internal/web"
+	"github.com/MainAlexStark/email-mcp/mail"
 	"github.com/MainAlexStark/email-mcp/mail/mailtest"
 )
 
@@ -276,6 +277,14 @@ func TestFullJourney(t *testing.T) {
 		t.Fatalf("главная: %d", code)
 	}
 	b.signup(pgtest.Email("alex"))
+
+	// Инструкции «где взять пароль» видны до ввода адреса — для каждого сервиса.
+	_, _, form := b.get("/account/mailboxes/new")
+	for _, p := range mail.Providers {
+		if !strings.Contains(form, p.Name) {
+			t.Fatalf("на форме нет инструкции для %s", p.Name)
+		}
+	}
 
 	// Неверный пароль не сохраняется, человек видит понятную причину.
 	code, _, page := s.addMailbox(b, "work", "wrong")

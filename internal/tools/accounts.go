@@ -118,7 +118,8 @@ func (r *Registry) RegisterAccounts() {
 				}
 				return obj{"found": false, "hint": "Домен не из списка известных провайдеров — " +
 					"адреса IMAP/SMTP узнайте у администратора почты или в справке хостинга. " +
-					"Обычно это imap.<домен>:993 (tls) и smtp.<домен>:465 (tls) или :587 (starttls)."}, nil
+					"Обычно это imap.<домен>:993 (tls) и smtp.<домен>:465 (tls) или :587 (starttls).",
+					"password": mail.CustomDomainGuide}, nil
 			}
 			if q := strings.ToLower(a.Str("provider")); q != "" {
 				for _, p := range mail.Providers {
