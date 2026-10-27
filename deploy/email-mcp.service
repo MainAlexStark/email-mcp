@@ -1,0 +1,55 @@
+# systemd-юнит для сервиса (без Docker). PostgreSQL ставится отдельно.
+#
+#   sudo cp deploy/email-mcp.service /etc/systemd/system/
+#   sudo cp deploy/email-mcp.env /etc/email-mcp.env
+#   sudo chmod 600 /etc/email-mcp.env      # там мастер-ключ и пароль базы
+#   sudo useradd --system --no-create-home --shell /usr/sbin/nologin emailmcp
+#   email-mcp --gen-secret                  # и положить в MAIL_SECRET_KEY
+#   sudo systemctl enable --now email-mcp
+
+[Unit]
+Description=MCP-сервер почты (IMAP/SMTP)
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=emailmcp
+Group=emailmcp
+
+# Секреты — в файле с правами 600, а не в командной строке:
+# аргументы процесса видны любому пользователю через ps.
+EnvironmentFile=/etc/email-mcp.env
+
+ExecStart=/usr/local/bin/email-mcp --http 127.0.0.1:8572
+
+# Состояния на диске нет: всё в PostgreSQL.
+
+Restart=always
+RestartSec=5s
+
+# Слушаем только петлю: наружу выпускает обратный прокси, который
+# занимается TLS. Порт 8572 не должен быть виден из интернета напрямую.
+
+# Ограничения прав: сервису нужны только исходящие IMAP/SMTP и база.
+# AF_UNIX — на случай базы на той же машине через сокет.
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictNamespaces=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+CapabilityBoundingSet=
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+
+[Install]
+WantedBy=multi-user.target

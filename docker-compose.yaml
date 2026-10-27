@@ -1,0 +1,87 @@
+# Развёртывание на VPS: сервис, база и TLS одной командой.
+#
+#   ./deploy.sh mail-mcp.example.com
+#
+
+name: email-mcp
+
+services:
+  email-mcp:
+    build:
+      context: .
+      args:
+        VERSION: ${VERSION:-docker}
+
+    container_name: email-mcp
+
+    restart: unless-stopped
+
+    env_file:
+      - ./deploy/email-mcp.env
+
+    # Сервер сам ждёт базу до минуты, но стартовать раньше неё
+    # незачем: в журнал сыпались бы бессмысленные ошибки подключения.
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+    # Наружу порт не выставлен: снаружи виден только Caddy, а он ходит
+    # сюда по внутренней сети compose. Для отладки с самой машины можно
+    # временно раскомментировать:
+    #
+    #   ports:
+    #     - "127.0.0.1:8572:8572"
+    expose:
+      - "8572"
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    # mcp-network — к Caddy; internal — к базе. Исходящие IMAP/SMTP
+    # (993, 465, 587) идут через сеть по умолчанию docker.
+    networks:
+      - mcp-network
+      - internal
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: email-mcp-postgres
+    restart: unless-stopped
+
+    # Отдельный файл, а не общий env: базе незачем видеть мастер-ключ
+    # шифрования паролей ящиков.
+    env_file:
+      - ./deploy/postgres.env
+
+    # Учётные записи и зашифрованные пароли ящиков. Том переживает
+    # пересборку и обновление; резервная копия — ./deploy.sh backup.
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 3s
+      timeout: 5s
+      retries: 20
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    # Только внутренняя сеть: база не видна ни Caddy, ни соседним
+    # MCP-серверам в mcp-network, ни тем более снаружи.
+    networks:
+      - internal
+
+volumes:
+  pgdata:
+
+networks:
+  mcp-network:
+    external: true
+  internal:

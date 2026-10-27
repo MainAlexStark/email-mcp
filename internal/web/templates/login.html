@@ -1,0 +1,15 @@
+{{define "title"}}Вход{{end}}
+{{define "body"}}
+<h1>Вход</h1>
+<p class="sub">Email MCP</p>
+{{if .Error}}<div class="err">{{.Error}}</div>{{end}}
+<form method="post" action="/login">
+<input type="hidden" name="next" value="{{.Next}}">
+<label class="field"><span>Почта</span>
+  <input type="email" name="email" value="{{.Email}}" autocomplete="email" required autofocus></label>
+<label class="field"><span>Пароль</span>
+  <input type="password" name="password" autocomplete="current-password" required></label>
+<div class="actions"><button type="submit" class="allow">Войти</button></div>
+</form>
+{{if .SignupOpen}}<p class="hint">Нет учётной записи? <a href="/signup?next={{.Next}}">Зарегистрироваться</a></p>{{end}}
+{{end}}

@@ -1,0 +1,54 @@
+{{define "title"}}{{if .Edit}}Настройки ящика{{else}}Подключить ящик{{end}}{{end}}
+{{define "body"}}
+<div class="top"><a href="/account">← Кабинет</a></div>
+<h1>{{if .Edit}}Ящик {{.Form.Name}}{{else if .First}}Подключите почтовый ящик{{else}}Ещё один ящик{{end}}</h1>
+<p class="sub">Для Gmail, Яндекса, Mail.ru, iCloud и других известных сервисов достаточно адреса и
+<b>пароля приложения</b> — серверы подставятся сами. Мы проверим вход до сохранения и будем хранить
+пароль зашифрованным.</p>
+{{if .Error}}<div class="err">{{.Error}}</div>{{end}}
+{{with .Provider}}{{if .AppPassword}}<div class="warn"><b>{{.Name}}:</b> нужен пароль приложения — {{.AppPassword}}.
+{{.Note}}</div>{{else if .Note}}<div class="warn"><b>{{.Name}}:</b> {{.Note}}</div>{{end}}{{end}}
+
+<form method="post" action="{{if .Edit}}/account/mailboxes/{{.ID}}/edit{{else}}/account/mailboxes/new{{end}}">
+<input type="hidden" name="csrf" value="{{.CSRF}}">
+<input type="hidden" name="next" value="{{.Next}}">
+<label class="field"><span>Адрес ящика</span>
+  <input type="email" name="email" value="{{.Form.Email}}" autocomplete="off" required {{if not .Edit}}autofocus{{end}}></label>
+<label class="field"><span>{{if .Edit}}Новый пароль приложения (пусто — оставить прежний){{else}}Пароль приложения{{end}}</span>
+  <input type="password" name="password" autocomplete="off" {{if not .Edit}}required{{end}}></label>
+{{if not .Edit}}
+<label class="field"><span>Имя для Claude (account_id, латиницей)</span>
+  <input type="text" name="name" value="{{.Form.Name}}" maxlength="64" pattern="[A-Za-z0-9_\-]+" placeholder="по умолчанию — по домену: gmail, yandex…"></label>
+{{end}}
+<label class="field"><span>Имя отправителя</span>
+  <input type="text" name="display_name" value="{{.Form.DisplayName}}" maxlength="80" placeholder="Алексей Стариков"></label>
+
+<details {{if .Advanced}}open{{end}}><summary>Серверы и логин (для своего домена или хостинга)</summary>
+<p class="hint">Пустые поля для известных сервисов заполняются сами. Обычно: IMAP 993 + tls, SMTP 465 + tls или 587 + starttls.</p>
+<label class="field"><span>Логин (если не совпадает с адресом)</span>
+  <input type="text" name="username" value="{{.Form.Username}}" autocomplete="off"></label>
+<label class="field"><span>IMAP-сервер</span>
+  <input type="text" name="imap_host" value="{{.Form.IMAPHost}}" placeholder="imap.example.com"></label>
+<label class="field"><span>IMAP-порт</span>
+  <input type="text" name="imap_port" value="{{.Form.IMAPPort}}" inputmode="numeric" placeholder="993"></label>
+<label class="field"><span>IMAP-защита</span>
+  <select name="imap_security">
+    <option value="tls" {{if or (eq .Form.IMAPSecurity "tls") (eq .Form.IMAPSecurity "")}}selected{{end}}>tls</option>
+    <option value="starttls" {{if eq .Form.IMAPSecurity "starttls"}}selected{{end}}>starttls</option>
+  </select></label>
+<label class="field"><span>SMTP-сервер (пусто — ящик без отправки)</span>
+  <input type="text" name="smtp_host" value="{{.Form.SMTPHost}}" placeholder="smtp.example.com"></label>
+<label class="field"><span>SMTP-порт</span>
+  <input type="text" name="smtp_port" value="{{.Form.SMTPPort}}" inputmode="numeric" placeholder="465"></label>
+<label class="field"><span>SMTP-защита</span>
+  <select name="smtp_security">
+    <option value="tls" {{if or (eq .Form.SMTPSecurity "tls") (eq .Form.SMTPSecurity "")}}selected{{end}}>tls</option>
+    <option value="starttls" {{if eq .Form.SMTPSecurity "starttls"}}selected{{end}}>starttls</option>
+  </select></label>
+</details>
+
+<div class="warn">Создайте для сервиса отдельный пароль приложения — тогда его можно отозвать в настройках
+почты, не меняя основной пароль и не трогая остальные программы.</div>
+<div class="actions"><button type="submit" class="allow">Проверить и {{if .Edit}}сохранить{{else}}подключить{{end}}</button></div>
+</form>
+{{end}}
